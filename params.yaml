@@ -1,0 +1,17 @@
+cleaning:
+  fill_children_with: 0
+  fill_country_with: "Unknown"
+  fill_agent_with: 0
+  fill_company_with: 0
+  remove_zero_guests: true
+  adr_min: 0
+  adr_max: 1000
+
+split:
+  test_size: 0.2
+  random_state: 42
+
+model:
+  type: "random_forest"
+  n_estimators: 100
+  max_depth: 10

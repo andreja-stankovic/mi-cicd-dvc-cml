@@ -1,0 +1,47 @@
+stages:
+  clean:
+    cmd: python src/clean_data.py
+    deps:
+      - src/clean_data.py
+      - data/raw/hotel_bookings.csv
+    params:
+      - cleaning
+    outs:
+      - data/processed/cleaned_hotel_bookings.csv
+
+  transform:
+    cmd: python src/transform_data.py
+    deps:
+      - src/transform_data.py
+      - data/processed/cleaned_hotel_bookings.csv
+    params:
+      - split
+    outs:
+      - data/processed/train.csv
+      - data/processed/test.csv
+
+  train:
+    cmd: python src/train.py
+    deps:
+      - src/train.py
+      - data/processed/train.csv
+    params:
+      - model
+      - split.random_state
+    outs:
+      - models/model.pkl
+
+  evaluate:
+    cmd: python src/evaluate.py
+    deps:
+      - src/evaluate.py
+      - data/processed/test.csv
+      - models/model.pkl
+    metrics:
+      - reports/metrics.json:
+          cache: false
+    outs:
+      - reports/classification_report.txt:
+          cache: false
+      - reports/confusion_matrix.png:
+          cache: false

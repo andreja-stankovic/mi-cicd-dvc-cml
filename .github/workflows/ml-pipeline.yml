@@ -31,7 +31,6 @@ jobs:
       AWS_SECRET_ACCESS_KEY: ${{ secrets.MINIO_SECRET_KEY }}
       AWS_EC2_METADATA_DISABLED: true
       DVC_REMOTE_ENDPOINT_URL: ${{ secrets.DVC_REMOTE_ENDPOINT_URL }}
-      REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
       - name: Checkout repository
@@ -42,10 +41,17 @@ jobs:
         run: |
           python --version
           python -m pip --version
-          where python
+          where.exe python
 
-      - name: Set up CML
-        uses: iterative/setup-cml@v2
+      - name: Check Node and npm
+        shell: powershell
+        run: |
+          node --version
+          npm --version
+          npx --version
+          where.exe node
+          where.exe npm
+          where.exe npx
 
       - name: Install Python dependencies
         shell: powershell
@@ -78,6 +84,8 @@ jobs:
 
       - name: Create CML report
         shell: powershell
+        env:
+          REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           "# ML Pipeline Report" | Out-File -FilePath report.md -Encoding utf8
           "" | Out-File -FilePath report.md -Append -Encoding utf8
@@ -130,4 +138,6 @@ jobs:
           "" | Out-File -FilePath report.md -Append -Encoding utf8
           "![Confusion Matrix](reports/confusion_matrix.png)" | Out-File -FilePath report.md -Append -Encoding utf8
 
-          cml comment create report.md --target=pr/${{ github.event.pull_request.number }} --publish=true
+          Get-Content report.md
+
+          npx --yes @dvcorg/cml comment create report.md --target=pr/${{ github.event.pull_request.number }} --publish=true

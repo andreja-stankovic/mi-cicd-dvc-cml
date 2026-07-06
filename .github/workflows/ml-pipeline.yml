@@ -1,0 +1,121 @@
+name: ML Pipeline with DVC and CML
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "src/**"
+      - "data/raw/*.dvc"
+      - "params.yaml"
+      - "dvc.yaml"
+      - "dvc.lock"
+      - "requirements.txt"
+      - ".github/workflows/ml-pipeline.yml"
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  checks: write
+
+jobs:
+  train-and-report:
+    name: Train model and publish CML report
+    runs-on: self-hosted
+
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.MINIO_ACCESS_KEY }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.MINIO_SECRET_KEY }}
+      AWS_EC2_METADATA_DISABLED: true
+      DVC_REMOTE_ENDPOINT_URL: ${{ secrets.DVC_REMOTE_ENDPOINT_URL }}
+      REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up CML
+        uses: iterative/setup-cml@v1
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Configure DVC remote
+        run: |
+          dvc remote modify --local minio-storage endpointurl "$DVC_REMOTE_ENDPOINT_URL"
+          dvc remote modify --local minio-storage access_key_id "$AWS_ACCESS_KEY_ID"
+          dvc remote modify --local minio-storage secret_access_key "$AWS_SECRET_ACCESS_KEY"
+          dvc remote list
+
+      - name: Pull DVC data
+        run: |
+          dvc pull
+
+      - name: Reproduce DVC pipeline
+        run: |
+          dvc repro
+
+      - name: Show DVC metrics
+        run: |
+          dvc metrics show
+
+      - name: Create CML report
+        run: |
+          echo "# ML Pipeline Report" > report.md
+          echo "" >> report.md
+          echo "Pipeline je automatski pokrenut pomoću GitHub Actions workflow-a." >> report.md
+          echo "" >> report.md
+
+          echo "## Data validation" >> report.md
+          echo "" >> report.md
+
+          python - <<'PY' >> report.md
+          import json
+
+          with open("reports/data_validation.json", "r", encoding="utf-8") as file:
+              validation = json.load(file)
+
+          print(f"- Status: **{validation['status']}**")
+          print(f"- Row count: **{validation['row_count']}**")
+          print(f"- Column count: **{validation['column_count']}**")
+          print("")
+          print("| Check | Passed | Details |")
+          print("|---|---:|---|")
+
+          for check in validation["checks"]:
+              status = "✅" if check["passed"] else "❌"
+              print(f"| {check['name']} | {status} | {check['details']} |")
+          PY
+
+          echo "" >> report.md
+          echo "## Model metrics" >> report.md
+          echo "" >> report.md
+
+          python - <<'PY' >> report.md
+          import json
+
+          with open("reports/metrics.json", "r", encoding="utf-8") as file:
+              metrics = json.load(file)
+
+          print("| Metric | Value |")
+          print("|---|---:|")
+          for key, value in metrics.items():
+              print(f"| {key} | {value} |")
+          PY
+
+          echo "" >> report.md
+          echo "## Confusion matrix" >> report.md
+          echo "" >> report.md
+          echo "![Confusion Matrix](reports/confusion_matrix.png)" >> report.md
+
+          cml comment create report.md

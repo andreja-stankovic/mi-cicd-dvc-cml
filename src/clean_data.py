@@ -47,6 +47,9 @@ def clean_data() -> None:
     adr_max = cleaning_params["adr_max"]
     df = df[(df["adr"] >= adr_min) & (df["adr"] <= adr_max)]
 
+    # Remove duplicates again after missing value handling and filtering
+    df = df.drop_duplicates()
+
     CLEANED_DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(CLEANED_DATA_PATH, index=False)
 

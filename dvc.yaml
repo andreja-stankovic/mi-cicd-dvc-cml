@@ -9,11 +9,23 @@ stages:
     outs:
       - data/processed/cleaned_hotel_bookings.csv
 
+  validate:
+    cmd: python src/validate_data.py
+    deps:
+      - src/validate_data.py
+      - data/processed/cleaned_hotel_bookings.csv
+    params:
+      - cleaning
+    metrics:
+      - reports/data_validation.json:
+          cache: false
+
   transform:
     cmd: python src/transform_data.py
     deps:
       - src/transform_data.py
       - data/processed/cleaned_hotel_bookings.csv
+      - reports/data_validation.json
     params:
       - split
     outs:

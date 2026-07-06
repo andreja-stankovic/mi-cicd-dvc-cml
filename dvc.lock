@@ -9,8 +9,8 @@ stages:
       size: 16855599
     - path: src/clean_data.py
       hash: md5
-      md5: 6d880eaa846c5c8fd73c34d0f4f05905
-      size: 1952
+      md5: 17a7ea6561d5b16552e4df541627ca0b
+      size: 2059
     params:
       params.yaml:
         cleaning:
@@ -33,6 +33,10 @@ stages:
       hash: md5
       md5: 06d09cd27d54b070e76e1d5da450a02a
       size: 12721161
+    - path: reports/data_validation.json
+      hash: md5
+      md5: c0f043c6cb9e239e16cacb8dff5652fa
+      size: 1610
     - path: src/transform_data.py
       hash: md5
       md5: 73da56c89d5708f8ae40888ff851a378
@@ -102,3 +106,29 @@ stages:
       hash: md5
       md5: 0eb41026fb128b723f42491c911f2a18
       size: 102
+  validate:
+    cmd: python src/validate_data.py
+    deps:
+    - path: data/processed/cleaned_hotel_bookings.csv
+      hash: md5
+      md5: 06d09cd27d54b070e76e1d5da450a02a
+      size: 12721161
+    - path: src/validate_data.py
+      hash: md5
+      md5: 56b3aba62786ee79b0925ec94fe0fcd8
+      size: 5316
+    params:
+      params.yaml:
+        cleaning:
+          fill_children_with: 0
+          fill_country_with: Unknown
+          fill_agent_with: 0
+          fill_company_with: 0
+          remove_zero_guests: true
+          adr_min: 0
+          adr_max: 1000
+    outs:
+    - path: reports/data_validation.json
+      hash: md5
+      md5: c0f043c6cb9e239e16cacb8dff5652fa
+      size: 1610

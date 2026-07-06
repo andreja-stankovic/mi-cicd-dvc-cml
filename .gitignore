@@ -16,7 +16,7 @@ venv/
 .idea/
 
 # Data and generated artifacts
-data/raw/*.csv
+# data/raw/*.csv
 data/processed/*
 models/*
 reports/*

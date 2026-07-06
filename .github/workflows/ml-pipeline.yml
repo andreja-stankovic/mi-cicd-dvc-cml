@@ -1,0 +1,143 @@
+name: ML Pipeline with DVC and CML
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "src/**"
+      - "data/raw/*.dvc"
+      - "params.yaml"
+      - "dvc.yaml"
+      - "dvc.lock"
+      - "requirements.txt"
+      - ".github/workflows/ml-pipeline.yml"
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  checks: write
+
+jobs:
+  train-and-report:
+    name: Train model and publish CML report
+    runs-on: self-hosted
+
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.MINIO_ACCESS_KEY }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.MINIO_SECRET_KEY }}
+      AWS_EC2_METADATA_DISABLED: true
+      DVC_REMOTE_ENDPOINT_URL: ${{ secrets.DVC_REMOTE_ENDPOINT_URL }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check Python
+        shell: powershell
+        run: |
+          python --version
+          python -m pip --version
+          where.exe python
+
+      - name: Check Node and npm
+        shell: powershell
+        run: |
+          node --version
+          npm --version
+          npx --version
+          where.exe node
+          where.exe npm
+          where.exe npx
+
+      - name: Install Python dependencies
+        shell: powershell
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Configure DVC remote
+        shell: powershell
+        run: |
+          dvc remote modify --local minio-storage endpointurl "$env:DVC_REMOTE_ENDPOINT_URL"
+          dvc remote modify --local minio-storage access_key_id "$env:AWS_ACCESS_KEY_ID"
+          dvc remote modify --local minio-storage secret_access_key "$env:AWS_SECRET_ACCESS_KEY"
+          dvc remote list
+
+      - name: Pull DVC data
+        shell: powershell
+        run: |
+          dvc pull
+
+      - name: Reproduce DVC pipeline
+        shell: powershell
+        run: |
+          dvc repro
+
+      - name: Show DVC metrics
+        shell: powershell
+        run: |
+          dvc metrics show
+
+      - name: Create CML report
+        shell: powershell
+        env:
+          REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          "# ML Pipeline Report" | Out-File -FilePath report.md -Encoding utf8
+          "" | Out-File -FilePath report.md -Append -Encoding utf8
+          "Pipeline je automatski pokrenut pomoću GitHub Actions workflow-a." | Out-File -FilePath report.md -Append -Encoding utf8
+          "" | Out-File -FilePath report.md -Append -Encoding utf8
+
+          "## Data validation" | Out-File -FilePath report.md -Append -Encoding utf8
+          "" | Out-File -FilePath report.md -Append -Encoding utf8
+
+          $validationScript = @'
+          import json
+
+          with open("reports/data_validation.json", "r", encoding="utf-8") as file:
+              validation = json.load(file)
+
+          print(f"- Status: **{validation['status']}**")
+          print(f"- Row count: **{validation['row_count']}**")
+          print(f"- Column count: **{validation['column_count']}**")
+          print("")
+          print("| Check | Passed | Details |")
+          print("|---|---:|---|")
+
+          for check in validation["checks"]:
+              status = "OK" if check["passed"] else "FAILED"
+              print(f"| {check['name']} | {status} | {check['details']} |")
+          '@
+
+          $validationScript | python - | Out-File -FilePath report.md -Append -Encoding utf8
+
+          "" | Out-File -FilePath report.md -Append -Encoding utf8
+          "## Model metrics" | Out-File -FilePath report.md -Append -Encoding utf8
+          "" | Out-File -FilePath report.md -Append -Encoding utf8
+
+          $metricsScript = @'
+          import json
+
+          with open("reports/metrics.json", "r", encoding="utf-8") as file:
+              metrics = json.load(file)
+
+          print("| Metric | Value |")
+          print("|---|---:|")
+          for key, value in metrics.items():
+              print(f"| {key} | {value} |")
+          '@
+
+          $metricsScript | python - | Out-File -FilePath report.md -Append -Encoding utf8
+
+          "" | Out-File -FilePath report.md -Append -Encoding utf8
+          "## Confusion matrix" | Out-File -FilePath report.md -Append -Encoding utf8
+          "" | Out-File -FilePath report.md -Append -Encoding utf8
+          "![Confusion Matrix](reports/confusion_matrix.png)" | Out-File -FilePath report.md -Append -Encoding utf8
+
+          Get-Content report.md
+
+          npx --yes @dvcorg/cml comment create report.md --target=pr/${{ github.event.pull_request.number }} --publish=true

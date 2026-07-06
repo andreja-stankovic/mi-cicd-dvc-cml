@@ -1,0 +1,134 @@
+schema: '2.0'
+stages:
+  clean:
+    cmd: python src/clean_data.py
+    deps:
+    - path: data/raw/hotel_bookings.csv
+      hash: md5
+      md5: 5bf588c5a949443e021fb7c847d31b27
+      size: 16855599
+    - path: src/clean_data.py
+      hash: md5
+      md5: 17a7ea6561d5b16552e4df541627ca0b
+      size: 2059
+    params:
+      params.yaml:
+        cleaning:
+          fill_children_with: 0
+          fill_country_with: Unknown
+          fill_agent_with: 0
+          fill_company_with: 0
+          remove_zero_guests: true
+          adr_min: 0
+          adr_max: 1000
+    outs:
+    - path: data/processed/cleaned_hotel_bookings.csv
+      hash: md5
+      md5: 06d09cd27d54b070e76e1d5da450a02a
+      size: 12721161
+  transform:
+    cmd: python src/transform_data.py
+    deps:
+    - path: data/processed/cleaned_hotel_bookings.csv
+      hash: md5
+      md5: 06d09cd27d54b070e76e1d5da450a02a
+      size: 12721161
+    - path: reports/data_validation.json
+      hash: md5
+      md5: c0f043c6cb9e239e16cacb8dff5652fa
+      size: 1610
+    - path: src/transform_data.py
+      hash: md5
+      md5: 73da56c89d5708f8ae40888ff851a378
+      size: 2757
+    params:
+      params.yaml:
+        split:
+          test_size: 0.2
+          random_state: 42
+    outs:
+    - path: data/processed/test.csv
+      hash: md5
+      md5: b950d79fe33dc2efc9461485d800ec71
+      size: 24499844
+    - path: data/processed/train.csv
+      hash: md5
+      md5: d51e9119243e5a62d52fb96529e299e2
+      size: 97985823
+  train:
+    cmd: python src/train.py
+    deps:
+    - path: data/processed/train.csv
+      hash: md5
+      md5: d51e9119243e5a62d52fb96529e299e2
+      size: 97985823
+    - path: src/train.py
+      hash: md5
+      md5: c2da9fde238cc555a457bf86485efe6c
+      size: 1537
+    params:
+      params.yaml:
+        model:
+          type: random_forest
+          n_estimators: 100
+          max_depth: 10
+        split.random_state: 42
+    outs:
+    - path: models/model.pkl
+      hash: md5
+      md5: 6072ae526d5fd281d3083451af335289
+      size: 4306537
+  evaluate:
+    cmd: python src/evaluate.py
+    deps:
+    - path: data/processed/test.csv
+      hash: md5
+      md5: b950d79fe33dc2efc9461485d800ec71
+      size: 24499844
+    - path: models/model.pkl
+      hash: md5
+      md5: 6072ae526d5fd281d3083451af335289
+      size: 4306537
+    - path: src/evaluate.py
+      hash: md5
+      md5: 96e1e0e77c366e501f1983c25e75c10d
+      size: 2380
+    outs:
+    - path: reports/classification_report.txt
+      hash: md5
+      md5: af31de4452ff576988209b2595e1aaa5
+      size: 334
+    - path: reports/confusion_matrix.png
+      hash: md5
+      md5: cb05b164246fb303876e7d9896333bbb
+      size: 22327
+    - path: reports/metrics.json
+      hash: md5
+      md5: 0eb41026fb128b723f42491c911f2a18
+      size: 102
+  validate:
+    cmd: python src/validate_data.py
+    deps:
+    - path: data/processed/cleaned_hotel_bookings.csv
+      hash: md5
+      md5: 06d09cd27d54b070e76e1d5da450a02a
+      size: 12721161
+    - path: src/validate_data.py
+      hash: md5
+      md5: 56b3aba62786ee79b0925ec94fe0fcd8
+      size: 5316
+    params:
+      params.yaml:
+        cleaning:
+          fill_children_with: 0
+          fill_country_with: Unknown
+          fill_agent_with: 0
+          fill_company_with: 0
+          remove_zero_guests: true
+          adr_min: 0
+          adr_max: 1000
+    outs:
+    - path: reports/data_validation.json
+      hash: md5
+      md5: c0f043c6cb9e239e16cacb8dff5652fa
+      size: 1610
